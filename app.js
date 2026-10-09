@@ -111,9 +111,9 @@ function drillLines(lesson) {
     fresh.map(k => k + k + k).join(' ') + ' ' + fresh.map(k => k + k).join(' '),
     [a + b + a, b + a + b, a + a + b, b + b + a].join(' '),
   ];
-  for (let n = 0; n < 2; n++) {
+  for (let n = 0; n < 1; n++) {
     const groups = [];
-    for (let g = 0; g < 5; g++) groups.push(pick(pool) + pick(pool) + pick(pool));
+    for (let g = 0; g < 4; g++) groups.push(pick(pool) + pick(pool) + pick(pool));
     lines.push(groups.join(' '));
   }
   return lines;
@@ -127,11 +127,11 @@ function wordLines(lesson) {
     if (line && (line + ' ' + w).length > 22) {
       lines.push(line);
       line = '';
-      if (lines.length === 4) break;
+      if (lines.length === 3) break;
     }
     line = line ? line + ' ' + w : w;
   }
-  if (line && lines.length < 4) lines.push(line);
+  if (line && lines.length < 3) lines.push(line);
   return lines;
 }
 
@@ -145,10 +145,7 @@ const STORE_KEY = 'typing-fun-v1';
 let save = {
   stars: {}, sound: true, unlockAll: false, best: {},
   kb: { palette: 'rainbow', shape: 'soft', board: '#ffffff', sticker: '' },
-  fruitMode: 'both',
-  surfLevel: 'small',
   rowVs: 'robot',
-  rowLevel: 'slow',
   rowers: [
     { who: '🍍', color: '#ff5d73', deco: 'stripes' },
     { who: '🐢', color: '#4cc9f0', deco: 'dots' },
@@ -194,6 +191,93 @@ const sfx = {
   beep: () => tone(440, 0, 0.15, 'triangle', 0.08),
 };
 
+/* ---------- Mochi's voice ---------- */
+let voice = null;
+function pickVoice() {
+  if (voice) return voice;
+  const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+  voice = voices.find(v => /Samantha|Google US English|Karen|Zira|Jenny/.test(v.name)) || voices[0] || null;
+  return voice;
+}
+
+function say(text) {
+  if (!save.sound || !text || !('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel(); // newest thing to say wins, so Mochi never falls behind
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.85;
+    u.pitch = 1.15;
+    if (pickVoice()) u.voice = voice;
+    speechSynthesis.speak(u);
+  } catch (e) { /* no voice */ }
+}
+
+const KEY_NAMES = { ' ': 'the space bar', ';': 'semicolon', ',': 'comma', '.': 'period', "'": 'apostrophe', '/': 'slash' };
+function keyName(key) {
+  return KEY_NAMES[key] || key.toUpperCase();
+}
+
+const HOME_KEY = { lp: 'a', lr: 's', lm: 'd', li: 'f', ri: 'j', rm: 'k', rr: 'l', rp: ';' };
+const rowChars = r => ROWS[r].filter(k => k[0].length === 1).map(k => k[0]);
+
+// words that tell her where a key is and which finger to use
+function describeKey(ch) {
+  const info = CHAR_MAP[ch];
+  if (!info) return '';
+  if (ch === ' ') return 'The space bar is the long key at the bottom. Press it with your thumb.';
+  const key = info.key;
+  const name = keyName(key);
+  const finger = FINGER_NAMES[info.finger];
+  const r = ROWS.findIndex(row => row.some(k => k[0] === key));
+  const i = rowChars(r).indexOf(key);
+  let text;
+  if (key === 'f' || key === 'j') {
+    text = `${name} is in the middle row. It has a little bump on it. Put your ${finger} on it.`;
+  } else if (r === 2) {
+    const home = HOME_KEY[info.finger];
+    text = home === key
+      ? `${name} is in the middle row, right under your ${finger}.`
+      : `${name} is in the middle row, right next to ${keyName(home)}. Slide your ${finger} over.`;
+  } else if (r === 1) {
+    text = `${name} is in the top row, just above ${keyName(rowChars(2)[i] || ';')}. Reach up with your ${finger}.`;
+  } else if (r === 3) {
+    text = `${name} is in the bottom row, just below ${keyName(rowChars(2)[i])}. Reach down with your ${finger}.`;
+  } else {
+    text = `${name} is in the number row at the very top, above ${keyName(rowChars(1)[i - 1] || 'q')}. Reach up with your ${finger}.`;
+  }
+  if (info.shift) text = `Hold the shift key with your ${info.shift === 'ShiftLeft' ? 'left' : 'right'} pinky. ` + text;
+  return text + ' Look for the glowing key.';
+}
+
+// if she waits a while without finding the key, Mochi helps
+let idleTimer = 0;
+function armIdle(help, firstWait = 6000) {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(function again() {
+    help();
+    idleTimer = setTimeout(again, 14000);
+  }, firstWait);
+}
+
+// make the key flash big, say where it is, and return the words
+function helpWith(ch) {
+  const info = CHAR_MAP[ch];
+  if (!info) return '';
+  keyEls[info.key].classList.add('help');
+  const text = describeKey(ch);
+  say(text);
+  return text;
+}
+
+// the letters she has learned in typing school (the middle row to begin with)
+function knownLetters() {
+  let known = 'asdfghjkl';
+  for (const l of LESSONS) {
+    if (l.keys && (save.stars[l.id] || save.unlockAll)) known += l.keys;
+  }
+  return [...new Set(known)].filter(c => c >= 'a' && c <= 'z');
+}
+
 /* ---------- elements and screens ---------- */
 const $ = id => document.getElementById(id);
 const overlay = $('resultOverlay');
@@ -204,6 +288,7 @@ const SCREENS = ['homeScreen', 'playScreen', 'kbScreen', 'fruitScreen', 'surfScr
 // whatever is being played right now: { onChar(ch, capsLock), expected(), stop() }
 let mode = null;
 function setMode(next) {
+  clearTimeout(idleTimer);
   if (mode && mode.stop) mode.stop();
   mode = next;
 }
@@ -276,11 +361,11 @@ function renderHome() {
   });
 
   $('starTotal').textContent = totalStars();
-  $('unlockBtn').hidden = save.unlockAll;
 }
 
 function showHome() {
   setMode(null);
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
   showScreen('homeScreen');
   renderHome();
 }
@@ -329,7 +414,7 @@ function buildKeyboard() {
 }
 
 function clearTargets() {
-  document.querySelectorAll('.key.target').forEach(el => el.classList.remove('target'));
+  document.querySelectorAll('.key.target, .key.help').forEach(el => el.classList.remove('target', 'help'));
   document.querySelectorAll('.finger.active').forEach(el => el.classList.remove('active'));
 }
 
@@ -358,14 +443,23 @@ function showTarget(ch) {
     fingerEls[info.finger[0] === 'l' ? 'left' : 'right'][info.finger].classList.add('active');
   }
 
-  const name = ch === ' ' ? 'the space bar' : escapeHtml(ch.toUpperCase());
-  let text = `Press <span class="chip f-${info.finger}">${name}</span> with your ${FINGER_NAMES[info.finger]}`;
   if (info.shift) {
     const pinky = info.shift === 'ShiftLeft' ? 'lp' : 'rp';
     fingerEls[pinky[0] === 'l' ? 'left' : 'right'][pinky].classList.add('active');
-    text = `Hold <span class="chip f-${pinky}">shift</span> and press <span class="chip f-${info.finger}">${escapeHtml(info.key.toUpperCase())}</span>`;
   }
-  hint.innerHTML = text;
+  hint.innerHTML = fingerHintHtml(ch);
+}
+
+// "Press F with your left pointer finger"
+function fingerHintHtml(ch) {
+  const info = CHAR_MAP[ch];
+  if (!info) return '';
+  const name = ch === ' ' ? 'the space bar' : escapeHtml(ch.toUpperCase());
+  if (info.shift) {
+    const pinky = info.shift === 'ShiftLeft' ? 'lp' : 'rp';
+    return `Hold <span class="chip f-${pinky}">shift</span> and press <span class="chip f-${info.finger}">${escapeHtml(info.key.toUpperCase())}</span>`;
+  }
+  return `Press <span class="chip f-${info.finger}">${name}</span> with your ${FINGER_NAMES[info.finger]}`;
 }
 
 function flashKey(ch, cls) {
@@ -423,7 +517,7 @@ function openKeyboardDesigner() {
   showScreen('kbScreen');
   renderKbOptions();
   // typing here just lights the keys up
-  setMode({ expected: () => null, onChar: ch => { flashKey(ch, 'hit'); sfx.good(); } });
+  setMode({ expected: () => null, onChar: ch => { flashKey(ch, 'hit'); sfx.good(); say(keyName(ch.toLowerCase())); } });
 }
 
 /* ---------- typing school ---------- */
@@ -431,7 +525,7 @@ function startLesson(index) {
   const lesson = LESSONS[index];
   const lines = buildLines(lesson);
   const run = {
-    line: 0, pos: 0, hits: 0, misses: 0, startedAt: 0,
+    line: 0, pos: 0, hits: 0, misses: 0, missesInRow: 0, spoken: '',
     total: lines.reduce((n, l) => n + l.length, 0),
   };
   const expected = () => lines[run.line][run.pos];
@@ -470,6 +564,29 @@ function startLesson(index) {
       span.classList.remove('oops');
     });
     showTarget(expected());
+    announce();
+    armIdle(explain);
+  }
+
+  // Mochi says what to press next
+  function announce() {
+    const line = lines[run.line];
+    const want = expected();
+    if (lesson.keys) {
+      // key drills: say the key and finger whenever the key changes
+      if (want !== run.spoken && want !== ' ') {
+        if (run.hits) say(`${keyName(want)}. ${FINGER_NAMES[CHAR_MAP[want].finger]}.`);
+        run.spoken = want;
+      }
+    } else if (run.hits && want !== ' ' && (run.pos === 0 || line[run.pos - 1] === ' ')) {
+      // word lessons: say each word as she gets to it
+      say('Type ' + line.slice(run.pos).split(' ')[0]);
+    }
+  }
+
+  // she is stuck: say and show where the key is
+  function explain() {
+    $('fingerHint').textContent = helpWith(expected());
   }
 
   function accuracy() {
@@ -484,9 +601,7 @@ function startLesson(index) {
 
   function finish() {
     const acc = accuracy();
-    const minutes = (performance.now() - run.startedAt) / 60000;
-    const wpm = minutes > 0 ? Math.round(run.total / 5 / minutes) : 0;
-    const stars = acc >= 95 ? 3 : acc >= 85 ? 2 : 1;
+    const stars = acc >= 90 ? 3 : acc >= 75 ? 2 : 1;
     save.stars[lesson.id] = Math.max(save.stars[lesson.id] || 0, stars);
     persist();
     $('starTotal').textContent = totalStars();
@@ -497,11 +612,11 @@ function startLesson(index) {
       title: ['', 'Good try!', 'Great job!', 'Amazing!'][stars],
       msg: [
         '',
-        'Go slowly and look for the glowing key. You can do it!',
-        'So close to three stars. Want to try once more?',
-        'Three stars! Your fingers are flying.',
+        'You finished! Go slowly and look for the glowing key.',
+        'You finished! So close to three stars.',
+        'Three stars! Your fingers know where to go.',
       ][stars],
-      stats: [[acc + '%', 'correct'], [wpm, 'words a minute']],
+      stats: [[acc + '%', 'correct'], [run.total, 'keys pressed']],
       again: () => startLesson(index),
       againLabel: 'Try again',
       next: hasNext ? () => startLesson(index + 1) : showHome,
@@ -511,10 +626,10 @@ function startLesson(index) {
   }
 
   function onChar(ch, capsLock) {
-    if (!run.startedAt) run.startedAt = performance.now();
     const want = expected();
 
     if (ch === want) {
+      run.missesInRow = 0;
       run.hits++;
       run.pos++;
       flashKey(want, 'hit');
@@ -533,9 +648,14 @@ function startLesson(index) {
       }
     } else {
       run.misses++;
+      run.missesInRow++;
       sfx.bad();
       flashKey(ch, 'miss');
       shake($('typeLine').querySelector('.current'));
+      // first slip: a quick reminder. Second slip: full directions.
+      if (run.missesInRow >= 2) explain();
+      else say(`Oops. Find ${keyName(want)}.`);
+      armIdle(explain);
       if (capsLock && ch.toLowerCase() === want.toLowerCase()) {
         $('fingerHint').innerHTML = '<span class="caps-warn">Caps Lock is on. Press the caps key to turn it off.</span>';
       }
@@ -549,6 +669,10 @@ function startLesson(index) {
   setMode({ expected, onChar });
   renderLine();
   updateStats();
+  const first = expected();
+  say(lesson.keys
+    ? `Let's learn ${lesson.keys.split('').map(keyName).join(' and ')}. Take your time. ${describeKey(first)}`
+    : `${lesson.title}. Take your time. Type ${lines[0].split(' ')[0]}. ${describeKey(first)}`);
 }
 
 function shake(el) {
@@ -579,6 +703,7 @@ function showResult(o) {
   setTimeout(() => { if (!overlay.hidden) $('nextBtn').focus(); }, 500);
 
   sfx.win();
+  say(o.title + ' ' + o.msg);
   if (o.confetti) confetti();
 }
 
@@ -622,14 +747,10 @@ $('soundBtn').addEventListener('click', e => {
   save.sound = !save.sound;
   persist();
   paintSound();
+  if (!save.sound && 'speechSynthesis' in window) speechSynthesis.cancel();
   e.currentTarget.blur(); // so the space bar doesn't toggle it mid-lesson
 });
 
-$('unlockBtn').addEventListener('click', () => {
-  save.unlockAll = true;
-  persist();
-  renderHome();
-});
 $('resetBtn').addEventListener('click', () => {
   if (!confirm('Erase all stars and start over?')) return;
   save.stars = {};

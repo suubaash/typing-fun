@@ -33,6 +33,7 @@
       </div>
 
       <h2 class="group-title">Games</h2>
+      <p class="school-note">Games use the keys you know. Finish lessons in typing school to add more keys!</p>
       <div class="game-grid">
         <button id="gameFruit" class="game-card g-fruit" type="button">
           <span class="game-art" aria-hidden="true">🥥⛵</span>
@@ -57,11 +58,10 @@
       </div>
 
       <h2 class="group-title school-title">Mochi's typing school</h2>
-      <p class="school-note">Put your pointer fingers on <kbd class="f-li">F</kbd> and <kbd class="f-ri">J</kbd> and follow the glowing key.</p>
+      <p class="school-note">Finish a lesson to open the next one. Put your pointer fingers on <kbd class="f-li">F</kbd> and <kbd class="f-ri">J</kbd> and follow the glowing key.</p>
       <div id="lessonGroups"></div>
 
       <footer class="home-footer">
-        <button id="unlockBtn" class="link-btn" type="button">Unlock all lessons</button>
         <button id="resetBtn" class="link-btn" type="button">Start over</button>
       </footer>
     </section>
@@ -105,7 +105,7 @@
         <h2>🥥 Fruit Lagoon</h2>
         <div class="hud"><span class="hud-pill">🧺 <b id="fruitCount">0</b></span></div>
       </div>
-      <div id="fruitModes" class="chips"></div>
+      <p id="fruitKeys" class="tip"></p>
       <div class="scene fruit-scene">
         <div class="sun"></div>
         <div class="cloud c1"></div><div class="cloud c2"></div>
@@ -114,7 +114,7 @@
         <div id="fruitSky"></div>
         <div id="fruitCheer" class="cheer" hidden></div>
       </div>
-      <p class="tip">No rush. Find the letter on a fruit and press it on your keyboard.</p>
+      <p id="fruitTip" class="tip mochi-says">No rush. Find the letter on a fruit and press it on your keyboard.</p>
       <div class="kb-slot"></div>
     </section>
 
@@ -124,11 +124,9 @@
         <button class="pill-btn back-btn" type="button">← Home</button>
         <h2>🍊 Surf Speedy</h2>
         <div class="hud">
-          <span class="hud-pill">⏱ <b id="surfTime">60</b></span>
           <span class="hud-pill">🏆 <b id="surfWords">0</b></span>
         </div>
       </div>
-      <div id="surfLevels" class="chips"></div>
       <div id="surfScene" class="scene surf-scene">
         <div class="sun"></div>
         <div class="cloud c1"></div>
@@ -144,7 +142,7 @@
         <div id="surfMarker" class="marker">🍊</div>
       </div>
       <div id="surfWord" class="type-line word-line"></div>
-      <p id="surfNext" class="next-word"></p>
+      <p id="surfNext" class="next-word mochi-says"></p>
       <div class="kb-slot"></div>
     </section>
 
@@ -157,7 +155,7 @@
       </div>
       <div class="panel setup-top">
         <div class="opt-row"><span class="opt-label">Who do you race?</span><div id="rowVs" class="chips"></div></div>
-        <div class="opt-row" id="rowLevelRow"><span class="opt-label">Robot speed</span><div id="rowLevel" class="chips"></div></div>
+        <p id="rowRule" class="tip"></p>
       </div>
       <div id="rowDesigners" class="designers"></div>
       <div class="start-row"><button id="rowStart" class="pill-btn primary big" type="button">Start the race! 🏁</button></div>
@@ -168,15 +166,14 @@
       <div class="play-head">
         <button class="pill-btn back-btn" type="button">← Home</button>
         <h2 id="raceTitle">🚣 Rowing Race</h2>
-        <div class="hud"><span class="hud-pill">⏱ <b id="raceTime">0.0</b></span></div>
+        <div class="hud"><span class="hud-pill">Oops: <b id="raceOops">0</b></span></div>
       </div>
       <div class="scene race-scene">
         <div id="raceLanes"></div>
         <div class="finish" aria-hidden="true"><span>🏁</span></div>
-        <div id="raceCount" class="countdown" hidden></div>
       </div>
       <div id="raceWord" class="type-line word-line"></div>
-      <p id="raceNext" class="next-word"></p>
+      <p id="raceNext" class="next-word mochi-says"></p>
       <div class="kb-slot"></div>
     </section>
   </main>

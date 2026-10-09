@@ -1,28 +1,43 @@
 'use strict';
 
-/* The three games: Fruit Lagoon, Surf Speedy and Rowing Race. */
+/* The three games: Fruit Lagoon, Surf Speedy and Rowing Race.
+   None of them has a clock. They only use keys already learned in typing school. */
 
 const WORDS = (
   'cat dog sun hat bee fox owl pig cow ant bat cup pie jam toy red big fun run hop sea ' +
   'fish frog duck bird moon star tree leaf rain snow cake milk ball kite boat wave sand palm surf swim jump play blue pink ' +
-  'apple mango lemon grape peach melon berry beach shell ocean happy smile funny tiger zebra panda koala whale shark robot pizza candy cloud ' +
-  'banana orange cherry papaya monkey turtle parrot rabbit kitten puppy island summer flower sunset paddle rocket dragon ' +
-  'coconut dolphin rainbow unicorn pineapple seashell surfboard starfish butterfly adventure treasure dinosaur chocolate'
+  'apple mango lemon grape peach melon berry beach shell ocean happy smile funny tiger zebra panda koala whale shark robot pizza candy cloud'
 ).split(' ');
 
-function wordsByLength(min, max) {
-  return WORDS.filter(w => w.length >= min && w.length <= max);
+// words she can type with the keys she knows
+function knownWords() {
+  const known = new Set(knownLetters());
+  const lessonWords = LESSONS.filter(l => l.words).flatMap(l => l.words.split(' '));
+  const all = [...new Set(WORDS.concat(lessonWords))];
+  return all.filter(w => w.length <= 5 && [...w].every(c => known.has(c)));
+}
+
+// a few words for one game, easy ones first
+function pickWords(count) {
+  const pool = shuffle(knownWords());
+  const short = pool.filter(w => w.length <= 3);
+  const long = pool.filter(w => w.length > 3);
+  return short.concat(long).slice(0, count).sort((a, b) => a.length - b.length);
 }
 
 function percent(hits, misses) {
   return hits + misses ? Math.round((hits / (hits + misses)) * 100) : 100;
 }
 
-// Shows one word at a time in lineEl. nextWord() returns the following word, or nothing when there are no more.
-function wordFeed(lineEl, nextEl, nextWord) {
-  let word = nextWord();
-  let upcoming = nextWord();
+// Shows one word at a time in lineEl, with the finger hint in hintEl.
+// Mochi says each word, and helps find the key if she waits or slips twice.
+function wordFeed(lineEl, hintEl, words, intro) {
+  const queue = words.slice();
+  let word = queue.shift();
   let pos = 0;
+  let missesInRow = 0;
+
+  const explain = () => { hintEl.textContent = helpWith(word[pos]); };
 
   function render() {
     lineEl.textContent = '';
@@ -33,10 +48,12 @@ function wordFeed(lineEl, nextEl, nextWord) {
       else if (i === pos) span.className = 'current';
       lineEl.append(span);
     });
-    nextEl.textContent = upcoming ? 'Next: ' + upcoming : '';
+    hintEl.innerHTML = fingerHintHtml(word[pos]);
     glowKeys([word[pos]]);
+    armIdle(explain);
   }
   render();
+  say(`${intro} Type ${word}.`);
 
   return {
     expected: () => (word ? word[pos] : null),
@@ -45,20 +62,25 @@ function wordFeed(lineEl, nextEl, nextWord) {
       if (!word) return 'end';
       if (ch.toLowerCase() !== word[pos]) {
         shake(lineEl.querySelector('.current'));
+        missesInRow++;
+        if (missesInRow >= 2) explain();
+        else say(`Oops. Find ${keyName(word[pos])}.`);
+        armIdle(explain);
         return 'miss';
       }
+      missesInRow = 0;
       pos++;
       if (pos < word.length) { render(); return 'hit'; }
-      word = upcoming;
-      upcoming = word ? nextWord() : null;
+      word = queue.shift();
       pos = 0;
       if (!word) {
         lineEl.textContent = '';
-        nextEl.textContent = '';
+        hintEl.textContent = '';
         clearTargets();
         return 'end';
       }
       render();
+      say(`Type ${word}.`);
       return 'word';
     },
   };
@@ -66,23 +88,19 @@ function wordFeed(lineEl, nextEl, nextWord) {
 
 /* ---------- game 1: Fruit Lagoon (relaxing) ---------- */
 const FRUITS = ['🍎', '🍌', '🍇', '🍓', '🍉', '🍍', '🥭', '🍑', '🍒', '🥝', '🍋', '🍊', '🍐', '🫐'];
-const FRUIT_MODES = [['letters', 'ABC'], ['numbers', '123'], ['both', 'ABC + 123']];
 const FRUIT_LANES = [3, 15, 27, 39, 51]; // % from the top
 const CHEERS = ['Yummy!', 'So relaxing!', 'Great picking!', 'The coconut says thanks!', 'What a fruit salad!'];
+const FRUIT_TIP = 'No rush. Find the letter on a fruit and press it on your keyboard.';
 
 function startFruit() {
   setMode(null);
   showScreen('fruitScreen');
-  chipRow($('fruitModes'), FRUIT_MODES, save.fruitMode, value => {
-    save.fruitMode = value;
-    persist();
-    startFruit();
-  });
 
   const sky = $('fruitSky');
-  const letters = 'abcdefghijklmnopqrstuvwxyz';
-  const digits = '0123456789';
-  const chars = save.fruitMode === 'letters' ? letters : save.fruitMode === 'numbers' ? digits : letters + digits;
+  // numbers join in once the numbers lesson is done
+  const chars = knownLetters().concat(save.stars.numbers ? [...'1234567890'] : []);
+  $('fruitKeys').textContent = 'Your keys: ' + chars.join(' ').toUpperCase();
+  $('fruitTip').textContent = FRUIT_TIP;
   const live = new Map(); // character -> fruit element
   const still = reducedMotion();
   let count = 0;
@@ -90,18 +108,26 @@ function startFruit() {
   $('fruitCount').textContent = 0;
   $('fruitCheer').hidden = true;
 
+  // she has not popped anything for a while: point one fruit out
+  function explain() {
+    const ch = live.keys().next().value;
+    if (!ch) return;
+    glowKeys([...live.keys()]);
+    $('fruitTip').textContent = `Can you find ${keyName(ch)}? ` + helpWith(ch);
+  }
+
   function spawn(lane, alreadyFloating) {
-    const ch = pick([...chars].filter(c => !live.has(c)));
+    const ch = pick(chars.filter(c => !live.has(c)));
     const el = document.createElement('div');
     el.className = 'fruit';
     el.style.top = FRUIT_LANES[lane] + '%';
     if (still) {
       el.style.left = 6 + lane * 18 + Math.random() * 6 + '%';
     } else {
-      const seconds = 24 + Math.random() * 14;
+      const seconds = 70 + Math.random() * 25; // a slow, sleepy drift
       el.style.animationDuration = seconds + 's';
-      // start part-way across so the sky isn't empty at the beginning
-      if (alreadyFloating) el.style.animationDelay = -(0.1 + Math.random() * 0.7) * seconds + 's';
+      // start part-way across so she never waits for a fruit to float in
+      if (alreadyFloating) el.style.animationDelay = -(0.15 + Math.random() * 0.6) * seconds + 's';
     }
     el.innerHTML = `<span class="fruit-bob"><span class="fruit-emoji">${pick(FRUITS)}</span><b>${ch.toUpperCase()}</b></span>`;
     // drifted off the far side without being picked: send a new one
@@ -129,15 +155,20 @@ function startFruit() {
     sfx.bell();
     count++;
     $('fruitCount').textContent = count;
+    $('fruitTip').textContent = FRUIT_TIP;
     if (count % 10 === 0) {
       const cheer = $('fruitCheer');
       cheer.textContent = `${count} fruits! ${pick(CHEERS)}`;
       cheer.hidden = false;
+      say(cheer.textContent);
       sfx.line();
       clearTimeout(cheerTimer);
       cheerTimer = setTimeout(() => { cheer.hidden = true; }, 2500);
+    } else {
+      say(keyName(key));
     }
-    spawn(Number(el.dataset.lane));
+    spawn(Number(el.dataset.lane), true);
+    armIdle(explain, 9000);
   }
 
   sky.textContent = '';
@@ -151,86 +182,53 @@ function startFruit() {
     },
   });
   FRUIT_LANES.forEach((_, lane) => spawn(lane, true));
+  say('Welcome to Fruit Lagoon. No rush. Find the letter on a fruit and press it.');
+  armIdle(explain, 9000);
 }
 
-/* ---------- game 2: Surf Speedy (fast) ---------- */
-const SURF_SECONDS = 60;
-// gain: how much wave one letter gives. Bigger waves need faster typing to stay in the great zone.
-const SURF_LEVELS = {
-  small: { name: '🌊 Small waves', len: [3, 4], gain: 20 },
-  big: { name: '🌊🌊 Big waves', len: [4, 6], gain: 11 },
-  giant: { name: '🌊🌊🌊 Giant waves', len: [5, 9], gain: 6.6 },
-};
-const ZONE_TEXT = ['😬 Uh-oh! Type faster!', '🙂 Doing okay!', '🤩 Doing great!'];
+/* ---------- game 2: Surf Speedy ---------- */
+// No clock: the wave grows with every right key and only shrinks on a wrong key.
+const SURF_WORDS = 8;
+const ZONE_TEXT = ['😬 Uh-oh! Slow down and look.', '🙂 Doing okay!', '🤩 Doing great!'];
 
 function startSurf() {
   setMode(null);
   showScreen('surfScreen');
-  chipRow($('surfLevels'), Object.entries(SURF_LEVELS).map(([id, l]) => [id, l.name]), save.surfLevel, value => {
-    save.surfLevel = value;
-    persist();
-    startSurf();
-  });
 
-  const level = SURF_LEVELS[save.surfLevel];
-  const pool = wordsByLength(...level.len);
-  let lastWord = '';
-  const feed = wordFeed($('surfWord'), $('surfNext'), () => {
-    let w;
-    do { w = pick(pool); } while (w === lastWord);
-    lastWord = w;
-    return w;
-  });
-
+  const list = pickWords(SURF_WORDS);
+  const feed = wordFeed($('surfWord'), $('surfNext'), list, 'Surf time! Every right key makes the wave grow. Take your time.');
   const scene = $('surfScene');
   const zones = $('surfMeter').querySelectorAll('.zone');
-  const zoneTime = [0, 0, 0];
-  let energy = 50; // 0 to 100: how well the surfer is doing
-  let startedAt = 0;
-  let last = 0;
-  let raf = 0;
+  let energy = 50; // 0 to 100: how big the wave is
   let words = 0;
   let hits = 0;
   let misses = 0;
 
   const zone = () => (energy < 33 ? 0 : energy < 66 ? 1 : 2);
 
-  function paint(secondsLeft) {
+  function paint() {
     const z = zone();
     scene.style.setProperty('--h', 8 + energy * 0.72 + 'px');
     scene.dataset.zone = z;
     zones.forEach((el, i) => el.classList.toggle('on', i === z));
     $('surfMarker').style.left = Math.min(97, Math.max(3, energy)) + '%';
-    $('surfZone').textContent = startedAt ? ZONE_TEXT[z] : 'Type the word to catch a wave!';
-    $('surfTime').textContent = Math.ceil(secondsLeft);
-    $('surfWords').textContent = words;
-  }
-
-  function frame(now) {
-    const dt = Math.min(0.25, (now - last) / 1000);
-    last = now;
-    energy *= Math.exp(-0.25 * dt); // the wave slowly shrinks unless you keep typing
-    zoneTime[zone()] += dt;
-    const left = SURF_SECONDS - (now - startedAt) / 1000;
-    paint(Math.max(0, left));
-    if (left <= 0) return finish();
-    raf = requestAnimationFrame(frame);
+    $('surfZone').textContent = hits + misses ? ZONE_TEXT[z] : 'Type the word to catch a wave!';
+    $('surfWords').textContent = `${words} / ${list.length}`;
   }
 
   function finish() {
-    const all = zoneTime[0] + zoneTime[1] + zoneTime[2] || 1;
-    const stars = zoneTime[2] / all >= 0.5 ? 3 : (zoneTime[1] + zoneTime[2]) / all >= 0.5 ? 2 : 1;
-    const bestKey = 'surf-' + save.surfLevel;
-    const oldBest = save.best[bestKey] || 0;
-    save.best[bestKey] = Math.max(oldBest, words);
-    persist();
+    const acc = percent(hits, misses);
+    const stars = acc >= 90 ? 3 : acc >= 75 ? 2 : 1;
     showResult({
       stars,
-      title: ['', 'Good try, surfer!', 'Nice surfing!', 'Surf champion!'][stars],
-      msg: words > oldBest && oldBest > 0
-        ? `New best! Your old best was ${oldBest} words.`
-        : ['', 'Keep your fingers moving to make the wave grow.', 'You stayed on the wave. Can you make it bigger?', 'You rode the biggest wave the whole way!'][stars],
-      stats: [[words, 'words'], [percent(hits, misses) + '%', 'correct']],
+      title: ['', 'You rode the wave!', 'Nice surfing!', 'Surf champion!'][stars],
+      msg: [
+        '',
+        'You finished every word. Next time, look for the glowing key first.',
+        'You finished every word. Careful fingers make the wave even bigger.',
+        'You finished every word with careful fingers!',
+      ][stars],
+      stats: [[words, 'words'], [acc + '%', 'correct']],
       again: startSurf,
       next: showHome,
       nextLabel: 'Home',
@@ -239,50 +237,51 @@ function startSurf() {
   }
 
   function onChar(ch) {
-    if (!startedAt) {
-      startedAt = last = performance.now();
-      raf = requestAnimationFrame(frame);
-    }
     const result = feed.type(ch);
     if (result === 'miss') {
       misses++;
-      energy = Math.max(0, energy - 5);
+      energy = Math.max(0, energy - 12);
       sfx.bad();
       flashKey(ch, 'miss');
-      return;
+    } else {
+      hits++;
+      energy = Math.min(100, energy + 7);
+      flashKey(ch.toLowerCase(), 'hit');
+      if (result === 'hit') sfx.good(); else { words++; sfx.line(); }
     }
-    hits++;
-    energy = Math.min(100, energy + level.gain);
-    flashKey(ch.toLowerCase(), 'hit');
-    if (result === 'word') { words++; sfx.line(); } else { sfx.good(); }
+    paint();
+    if (result === 'end') finish();
   }
 
-  paint(SURF_SECONDS);
-  setMode({ onChar, expected: feed.expected, stop: () => cancelAnimationFrame(raf) });
+  paint();
+  setMode({ onChar, expected: feed.expected });
 }
 
 /* ---------- game 3: Rowing Race ---------- */
-const ROW_LEVELS = {
-  slow: { name: '🐢 Slow', cps: 0.6, len: [3, 4] },
-  medium: { name: '🐇 Medium', cps: 1.2, len: [3, 5] },
-  fast: { name: '🚀 Fast', cps: 2.2, len: [4, 7] },
-};
+// No clock here either. Against the robot, the robot only rows when she presses a wrong key.
+// Friends take turns, and the one with fewer wrong keys wins.
 const ROBOT_ROWER = { who: '🤖', color: '#9fb4c7', deco: 'dots' };
-const RACE_WORDS = 10;
+const RACE_WORDS = 5;
+const ROBOT_STEPS = 6; // wrong keys it takes for the robot to finish
 
 function openRowSetup() {
   setMode(null);
   showScreen('rowSetupScreen');
   const friend = save.rowVs === 'friend';
-  const again = (key) => value => { save[key] = value; persist(); openRowSetup(); };
-  chipRow($('rowVs'), [['robot', '🤖 The robot'], ['friend', '👫 A friend']], save.rowVs, again('rowVs'));
-  chipRow($('rowLevel'), Object.entries(ROW_LEVELS).map(([id, l]) => [id, l.name]), save.rowLevel, again('rowLevel'));
-  $('rowLevelRow').hidden = friend;
+  chipRow($('rowVs'), [['robot', '🤖 The robot'], ['friend', '👫 A friend']], save.rowVs, value => {
+    save.rowVs = value;
+    persist();
+    openRowSetup();
+  });
+  $('rowRule').textContent = friend
+    ? 'Take turns on the keyboard. No clock! Whoever presses fewer wrong keys wins.'
+    : 'No clock! The robot only rows when you press a wrong key, so take your time.';
 
   const box = $('rowDesigners');
   box.textContent = '';
   box.append(designerPanel(0, friend ? 'Player 1' : 'Your boat'));
   if (friend) box.append(designerPanel(1, 'Player 2'));
+  say(`Pick who is rowing and design your boat. ${$('rowRule').textContent}`);
 }
 
 // pick a rower and design their boat
@@ -321,63 +320,56 @@ function designerPanel(index, label) {
   return panel;
 }
 
-const seconds = t => t.toFixed(1);
-
 function startMatch() {
-  const friend = save.rowVs === 'friend';
-  const level = ROW_LEVELS[save.rowLevel];
-  const words = shuffle(wordsByLength(...(friend ? [3, 5] : level.len))).slice(0, RACE_WORDS);
-  const letters = words.reduce((n, w) => n + w.length, 0);
-  const common = { words, again: startMatch, againLabel: 'Race again', next: openRowSetup, nextLabel: 'Change boats' };
+  const words = pickWords(RACE_WORDS);
+  const common = { again: startMatch, againLabel: 'Race again', next: openRowSetup, nextLabel: 'Change boats' };
 
-  if (!friend) {
-    const robotTime = letters / level.cps;
+  if (save.rowVs !== 'friend') {
     runRace({
-      words, typist: 0,
+      words, typist: 0, robot: true,
       rowers: [save.rowers[0], ROBOT_ROWER],
       names: ['You', 'Robot'],
-      rivalLetters: t => level.cps * t,
-      done(time) {
-        const won = time < robotTime;
+      intro: 'Row, row, row! The robot only moves when you press a wrong key.',
+      done(misses, robotWon) {
         showResult({
           ...common,
-          stars: won ? 3 : time < robotTime * 1.3 ? 2 : 1,
-          title: won ? 'You won the race!' : 'The robot won this time',
-          msg: won ? 'You rowed faster than the robot. Try a faster robot next!' : 'So close! Keep rowing and you will catch it.',
-          stats: [[seconds(time), 'your seconds'], [seconds(robotTime), 'robot seconds']],
-          confetti: won,
+          stars: robotWon ? 1 : misses <= 1 ? 3 : 2,
+          title: robotWon ? 'You finished the race!' : 'You won the race!',
+          msg: robotWon
+            ? 'The robot got there first this time. Look for the glowing key before you press.'
+            : 'Your careful fingers beat the robot!',
+          stats: [[words.length, 'words'], [misses, 'wrong keys']],
+          confetti: !robotWon,
         });
       },
     });
     return;
   }
 
-  // friends take turns on the same keyboard; player 2 races a replay of player 1
   runRace({
     words, typist: 0,
     rowers: save.rowers,
     names: ['Player 1', 'Player 2 (next)'],
-    rivalLetters: () => 0,
-    done(time1, stamps) {
+    intro: 'Player 1, it is your turn.',
+    done(misses1) {
       showResult({
         stars: null,
         title: 'Player 1 is done!',
-        msg: 'Player 2, put your hands on the keyboard. You will race the boat of Player 1.',
-        stats: [[seconds(time1), 'Player 1 seconds']],
+        msg: 'Player 2, put your hands on the keyboard.',
+        stats: [[misses1, 'Player 1 wrong keys']],
         nextLabel: 'Player 2, go!',
         next: () => runRace({
-          words, typist: 1,
+          words, typist: 1, rivalDone: true,
           rowers: save.rowers,
           names: ['Player 1', 'Player 2'],
-          rivalLetters: t => stamps.filter(s => s <= t).length,
-          done(time2) {
-            const winner = time1 === time2 ? 'It is a tie!' : (time1 < time2 ? 'Player 1' : 'Player 2') + ' wins!';
+          intro: 'Player 2, it is your turn.',
+          done(misses2) {
             showResult({
               ...common,
               stars: null,
-              title: winner,
+              title: misses1 === misses2 ? 'It is a tie!' : (misses1 < misses2 ? 'Player 1' : 'Player 2') + ' wins!',
               msg: 'What a race! Shake hands and race again.',
-              stats: [[seconds(time1), 'Player 1 seconds'], [seconds(time2), 'Player 2 seconds']],
+              stats: [[misses1, 'Player 1 wrong keys'], [misses2, 'Player 2 wrong keys']],
               confetti: true,
             });
           },
@@ -387,7 +379,7 @@ function startMatch() {
   });
 }
 
-// o: { words, typist (0 or 1), rowers, names, rivalLetters(t), done(time, stamps) }
+// o: { words, typist (0 or 1), rowers, names, intro, robot, rivalDone, done(misses, robotWon) }
 function runRace(o) {
   setMode(null);
   showScreen('raceScreen');
@@ -410,71 +402,44 @@ function runRace(o) {
     return boat;
   });
   $('raceTitle').textContent = `🚣 ${o.names[o.typist]}: type to row!`;
-  $('raceTime').textContent = '0.0';
+  $('raceOops').textContent = 0;
 
-  const queue = o.words.slice();
-  const feed = wordFeed($('raceWord'), $('raceNext'), () => queue.shift());
-  const stamps = []; // when each letter was typed, for the replay
-  const timers = [];
-  let startedAt = 0;
-  let raf = 0;
-  let hits = 0;
-
-  const elapsed = () => (performance.now() - startedAt) / 1000;
   const place = (boat, progress) => boat.style.setProperty('--p', Math.min(1, progress));
+  const stroke = boat => {
+    boat.classList.remove('stroke');
+    void boat.offsetWidth; // restart the oar swing
+    boat.classList.add('stroke');
+  };
+  if (o.rivalDone) place(boats[rival], 1);
 
-  function frame() {
-    const t = elapsed();
-    const progress = o.rivalLetters(t) / total;
-    place(boats[rival], progress);
-    boats[rival].classList.toggle('rowing', progress > 0 && progress < 1);
-    $('raceTime').textContent = seconds(t);
-    raf = requestAnimationFrame(frame);
-  }
-
-  // 3, 2, 1, Go!
-  const count = $('raceCount');
-  ['3', '2', '1', 'Go!'].forEach((text, i) => {
-    timers.push(setTimeout(() => {
-      count.hidden = false;
-      count.textContent = text;
-      if (i < 3) return sfx.beep();
-      sfx.line();
-      startedAt = performance.now();
-      raf = requestAnimationFrame(frame);
-      timers.push(setTimeout(() => { count.hidden = true; }, 600));
-    }, i * 800));
-  });
+  const feed = wordFeed($('raceWord'), $('raceNext'), o.words, o.intro);
+  let hits = 0;
+  let misses = 0;
+  let robotWon = false;
 
   function onChar(ch) {
-    if (!startedAt) return; // wait for Go!
     const result = feed.type(ch);
     if (result === 'miss') {
+      misses++;
+      $('raceOops').textContent = misses;
       sfx.bad();
       flashKey(ch, 'miss');
+      if (o.robot) {
+        place(boats[rival], misses / ROBOT_STEPS);
+        stroke(boats[rival]);
+        if (misses >= ROBOT_STEPS) robotWon = true;
+      }
       return;
     }
-    const t = elapsed();
     hits++;
-    stamps.push(t);
     place(boats[o.typist], hits / total);
-    boats[o.typist].classList.remove('stroke');
-    void boats[o.typist].offsetWidth;
-    boats[o.typist].classList.add('stroke');
+    stroke(boats[o.typist]);
     flashKey(ch.toLowerCase(), 'hit');
-    if (result === 'word') sfx.line(); else sfx.good();
-    if (result === 'end') o.done(t, stamps);
+    if (result === 'hit') sfx.good(); else sfx.line();
+    if (result === 'end') o.done(misses, robotWon);
   }
 
-  setMode({
-    onChar,
-    expected: () => (startedAt ? feed.expected() : null),
-    stop() {
-      cancelAnimationFrame(raf);
-      timers.forEach(clearTimeout);
-      count.hidden = true;
-    },
-  });
+  setMode({ onChar, expected: feed.expected });
 }
 
 $('gameFruit').addEventListener('click', startFruit);
