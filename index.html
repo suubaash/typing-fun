@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Typing Fun</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <button id="homeBtn" class="brand" type="button" aria-label="Go to the home page">
+      <span class="brand-mark" aria-hidden="true">🌺</span>
+      <span class="brand-name">Typing Fun</span>
+    </button>
+    <div class="topbar-right">
+      <div class="star-count" aria-label="Stars collected">
+        <span aria-hidden="true">⭐</span>
+        <span id="starTotal">0</span>
+      </div>
+      <button id="soundBtn" class="icon-btn" type="button" aria-pressed="true" aria-label="Sound on">🔊</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="homeScreen" class="screen">
+      <div class="hero">
+        <div class="cat-slot hero-cat"></div>
+        <div class="bubble hero-bubble">
+          <h1>Aloha! I'm Mochi.</h1>
+          <p>I'm your robot cat teacher. Pick a game, or learn new keys in my typing school!</p>
+        </div>
+      </div>
+
+      <h2 class="group-title">Games</h2>
+      <div class="game-grid">
+        <button id="gameFruit" class="game-card g-fruit" type="button">
+          <span class="game-art" aria-hidden="true">🥥⛵</span>
+          <span class="game-name">Fruit Lagoon</span>
+          <span class="game-sub">Relax and pop the floating fruits</span>
+        </button>
+        <button id="gameSurf" class="game-card g-surf" type="button">
+          <span class="game-art" aria-hidden="true">🍊🏄</span>
+          <span class="game-name">Surf Speedy</span>
+          <span class="game-sub">Type fast to ride the big wave</span>
+        </button>
+        <button id="gameRow" class="game-card g-row" type="button">
+          <span class="game-art" aria-hidden="true">🚣🏁</span>
+          <span class="game-name">Rowing Race</span>
+          <span class="game-sub">Design a boat and race a friend</span>
+        </button>
+        <button id="gameKb" class="game-card g-kb" type="button">
+          <span class="game-art" aria-hidden="true">⌨️🎨</span>
+          <span class="game-name">My Keyboard</span>
+          <span class="game-sub">Design your very own keyboard</span>
+        </button>
+      </div>
+
+      <h2 class="group-title school-title">Mochi's typing school</h2>
+      <p class="school-note">Put your pointer fingers on <kbd class="f-li">F</kbd> and <kbd class="f-ri">J</kbd> and follow the glowing key.</p>
+      <div id="lessonGroups"></div>
+
+      <footer class="home-footer">
+        <button id="unlockBtn" class="link-btn" type="button">Unlock all lessons</button>
+        <button id="resetBtn" class="link-btn" type="button">Start over</button>
+      </footer>
+    </section>
+
+    <!-- Typing school lesson -->
+    <section id="playScreen" class="screen" hidden>
+      <div class="play-head">
+        <button class="pill-btn back-btn" type="button">← Home</button>
+        <h2 id="lessonTitle"></h2>
+        <div class="hud"><span><b id="liveAcc">100%</b> correct</span></div>
+      </div>
+      <div class="progress" aria-hidden="true"><div id="progressFill" class="progress-fill"></div></div>
+      <div id="typeLine" class="type-line"></div>
+      <div class="teacher">
+        <div class="cat-slot teacher-cat"></div>
+        <p id="fingerHint" class="bubble finger-hint"></p>
+        <div class="hands" aria-hidden="true">
+          <div class="hand" id="leftHand"></div>
+          <div class="hand" id="rightHand"></div>
+        </div>
+      </div>
+      <div class="kb-slot"><div id="keyboard" class="keyboard" aria-hidden="true"></div></div>
+    </section>
+
+    <!-- Keyboard designer -->
+    <section id="kbScreen" class="screen" hidden>
+      <div class="play-head">
+        <button class="pill-btn back-btn" type="button">← Home</button>
+        <h2>⌨️ My Keyboard</h2>
+        <div class="hud"><button id="kbSurprise" class="pill-btn" type="button">🎲 Surprise me</button></div>
+      </div>
+      <div id="kbOptions" class="panel kb-options"></div>
+      <p class="tip">Press any key to try it out!</p>
+      <div class="kb-slot"></div>
+    </section>
+
+    <!-- Game 1: relaxing fruit game -->
+    <section id="fruitScreen" class="screen" hidden>
+      <div class="play-head">
+        <button class="pill-btn back-btn" type="button">← Home</button>
+        <h2>🥥 Fruit Lagoon</h2>
+        <div class="hud"><span class="hud-pill">🧺 <b id="fruitCount">0</b></span></div>
+      </div>
+      <div id="fruitModes" class="chips"></div>
+      <div class="scene fruit-scene">
+        <div class="sun"></div>
+        <div class="cloud c1"></div><div class="cloud c2"></div>
+        <div class="sea"></div>
+        <div class="coco"><div class="coco-slot"></div></div>
+        <div id="fruitSky"></div>
+        <div id="fruitCheer" class="cheer" hidden></div>
+      </div>
+      <p class="tip">No rush. Find the letter on a fruit and press it on your keyboard.</p>
+      <div class="kb-slot"></div>
+    </section>
+
+    <!-- Game 2: fast surfing game -->
+    <section id="surfScreen" class="screen" hidden>
+      <div class="play-head">
+        <button class="pill-btn back-btn" type="button">← Home</button>
+        <h2>🍊 Surf Speedy</h2>
+        <div class="hud">
+          <span class="hud-pill">⏱ <b id="surfTime">60</b></span>
+          <span class="hud-pill">🏆 <b id="surfWords">0</b></span>
+        </div>
+      </div>
+      <div id="surfLevels" class="chips"></div>
+      <div id="surfScene" class="scene surf-scene">
+        <div class="sun"></div>
+        <div class="cloud c1"></div>
+        <div class="bigwave"></div>
+        <div class="surfer"><div class="surfer-slot"></div></div>
+        <div class="sea"></div>
+        <div id="surfZone" class="zone-label"></div>
+      </div>
+      <div id="surfMeter" class="meter" aria-hidden="true">
+        <div class="zone z-bad">😬 Uh-oh</div>
+        <div class="zone z-ok">🙂 Okay</div>
+        <div class="zone z-good">🤩 Great</div>
+        <div id="surfMarker" class="marker">🍊</div>
+      </div>
+      <div id="surfWord" class="type-line word-line"></div>
+      <p id="surfNext" class="next-word"></p>
+      <div class="kb-slot"></div>
+    </section>
+
+    <!-- Game 3: rowing race setup -->
+    <section id="rowSetupScreen" class="screen" hidden>
+      <div class="play-head">
+        <button class="pill-btn back-btn" type="button">← Home</button>
+        <h2>🚣 Rowing Race</h2>
+        <div class="hud"></div>
+      </div>
+      <div class="panel setup-top">
+        <div class="opt-row"><span class="opt-label">Who do you race?</span><div id="rowVs" class="chips"></div></div>
+        <div class="opt-row" id="rowLevelRow"><span class="opt-label">Robot speed</span><div id="rowLevel" class="chips"></div></div>
+      </div>
+      <div id="rowDesigners" class="designers"></div>
+      <div class="start-row"><button id="rowStart" class="pill-btn primary big" type="button">Start the race! 🏁</button></div>
+    </section>
+
+    <!-- Game 3: the race -->
+    <section id="raceScreen" class="screen" hidden>
+      <div class="play-head">
+        <button class="pill-btn back-btn" type="button">← Home</button>
+        <h2 id="raceTitle">🚣 Rowing Race</h2>
+        <div class="hud"><span class="hud-pill">⏱ <b id="raceTime">0.0</b></span></div>
+      </div>
+      <div class="scene race-scene">
+        <div id="raceLanes"></div>
+        <div class="finish" aria-hidden="true"><span>🏁</span></div>
+        <div id="raceCount" class="countdown" hidden></div>
+      </div>
+      <div id="raceWord" class="type-line word-line"></div>
+      <p id="raceNext" class="next-word"></p>
+      <div class="kb-slot"></div>
+    </section>
+  </main>
+
+  <!-- Finished -->
+  <div id="resultOverlay" class="overlay" hidden>
+    <div class="result-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <div class="cat-slot result-cat"></div>
+      <div id="resultStars" class="result-stars" aria-hidden="true"></div>
+      <h2 id="resultTitle"></h2>
+      <p id="resultMsg" class="result-msg"></p>
+      <div id="resultStats" class="result-stats"></div>
+      <div class="result-actions">
+        <button id="againBtn" class="pill-btn" type="button">Play again</button>
+        <button id="nextBtn" class="pill-btn primary" type="button">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confetti" class="confetti" aria-hidden="true"></div>
+
+  <script src="art.js"></script>
+  <script src="app.js"></script>
+  <script src="games.js"></script>
+</body>
+</html>
