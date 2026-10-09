@@ -233,7 +233,7 @@ kbd {
 .lesson-stars { font-size: 1.05rem; letter-spacing: 2px; }
 .lesson-stars .off { filter: grayscale(1); opacity: .3; }
 
-.home-footer { display: flex; gap: 20px; justify-content: center; margin-top: 36px; }
+.home-footer { display: flex; gap: 20px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 36px; }
 .link-btn {
   background: none;
   border: 0;
@@ -634,6 +634,40 @@ kbd {
 }
 .emoji-btn[aria-pressed="true"] { border-color: var(--primary); background: #efeaff; }
 .start-row { text-align: center; margin-top: 18px; }
+
+/* ---------- playing online ---------- */
+.online-panel { text-align: center; }
+.online-panel .who { font-weight: 800; font-size: 1.15rem; margin: 6px 0 10px; }
+.online-panel .status { margin: 4px 0 12px; font-weight: 700; }
+.online-panel .status.on { color: var(--good); }
+.online-panel .chips { justify-content: center; }
+.online-panel .pill-btn:disabled { opacity: .45; cursor: not-allowed; }
+.online-panel .small { margin-top: 10px; font-size: .9rem; color: var(--ink-soft); }
+.invite-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  background: #fff3b0;
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  padding: 12px 18px;
+  font-weight: 800;
+  box-shadow: 0 8px 0 rgba(43, 42, 76, .2);
+}
+.race-scene.three .lane { height: 72px; }
+.race-scene.three .boat-wrap { width: 92px; bottom: 0; }
+.race-scene.three .lane-name { top: 4px; }
+.voice-row { color: var(--ink-soft); font-size: .9rem; display: flex; align-items: center; gap: 8px; }
+.voice-row select { font: inherit; padding: 4px 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); max-width: 14em; }
 
 /* ---------- finished card ---------- */
 .overlay {

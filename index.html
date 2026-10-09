@@ -27,8 +27,8 @@
       <div class="hero">
         <div class="cat-slot hero-cat"></div>
         <div class="bubble hero-bubble">
-          <h1>Aloha! I'm Mochi.</h1>
-          <p>I'm your robot cat teacher. Pick a game, or learn new keys in my typing school!</p>
+          <h1 id="heroHello">Aloha! I'm Mochi.</h1>
+          <p id="heroText">I'm your robot cat teacher. Pick a game, or learn new keys in my typing school!</p>
         </div>
       </div>
 
@@ -48,7 +48,7 @@
         <button id="gameRow" class="game-card g-row" type="button">
           <span class="game-art" aria-hidden="true">🚣🏁</span>
           <span class="game-name">Rowing Race</span>
-          <span class="game-sub">Design a boat and race a friend</span>
+          <span class="game-sub">Design a boat and race your cousin</span>
         </button>
         <button id="gameKb" class="game-card g-kb" type="button">
           <span class="game-art" aria-hidden="true">⌨️🎨</span>
@@ -62,6 +62,7 @@
       <div id="lessonGroups"></div>
 
       <footer class="home-footer">
+        <label id="voiceRow" class="voice-row" hidden>Mochi's voice <select id="voiceSelect"></select></label>
         <button id="resetBtn" class="link-btn" type="button">Start over</button>
       </footer>
     </section>
@@ -156,6 +157,7 @@
       <div class="panel setup-top">
         <div class="opt-row"><span class="opt-label">Who do you race?</span><div id="rowVs" class="chips"></div></div>
         <p id="rowRule" class="tip"></p>
+        <div id="onlinePanel" class="online-panel" hidden></div>
       </div>
       <div id="rowDesigners" class="designers"></div>
       <div class="start-row"><button id="rowStart" class="pill-btn primary big" type="button">Start the race! 🏁</button></div>
@@ -193,10 +195,19 @@
     </div>
   </div>
 
+  <!-- A cousin far away wants to play -->
+  <div id="inviteBanner" class="invite-banner" role="alertdialog" aria-labelledby="inviteText" hidden>
+    <span id="inviteText"></span>
+    <button id="inviteYes" class="pill-btn primary" type="button">Let's go!</button>
+    <button id="inviteNo" class="pill-btn" type="button">Not now</button>
+  </div>
+
   <div id="confetti" class="confetti" aria-hidden="true"></div>
 
   <script src="art.js"></script>
   <script src="app.js"></script>
   <script src="games.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js" defer></script>
+  <script src="online.js" defer></script>
 </body>
 </html>

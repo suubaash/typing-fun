@@ -146,6 +146,8 @@ let save = {
   stars: {}, sound: true, unlockAll: false, best: {},
   kb: { palette: 'rainbow', shape: 'soft', board: '#ffffff', sticker: '' },
   rowVs: 'robot',
+  me: '', // which cousin plays on this device
+  voice: '',
   rowers: [
     { who: '🍍', color: '#ff5d73', deco: 'stripes' },
     { who: '🐢', color: '#4cc9f0', deco: 'dots' },
@@ -192,11 +194,36 @@ const sfx = {
 };
 
 /* ---------- Mochi's voice ---------- */
+// The voice comes from the device, so we look for the most natural one it has.
+const VOICE_RANK = [
+  [/Natural|Neural/i, 100],            // Microsoft Edge
+  [/Google US English/i, 90],          // Chrome
+  [/\(Premium\)/i, 85], [/\(Enhanced\)/i, 80], // downloaded Apple voices
+  [/^(Ava|Zoe|Allison|Evan|Nathan|Joelle|Noelle)\b/i, 70],
+  [/Samantha/i, 60],
+  [/Google UK English Female/i, 55],
+  [/Karen|Moira|Tessa|Serena|Daniel|Zira|Aria|Jenny/i, 40],
+];
+const JOKE_VOICES = /Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Wobble|Zarvox|Trinoids|Whisper|Jester|Organ|Superstar|Good News|Fred|Junior|Kathy|Ralph|Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley/i;
+
+function voiceScore(v) {
+  const hit = VOICE_RANK.find(([pattern]) => pattern.test(v.name));
+  return (hit ? hit[1] : 0) + (v.lang === 'en-US' ? 5 : 0);
+}
+
+// English voices, most natural first
+function goodVoices() {
+  if (!('speechSynthesis' in window)) return [];
+  return speechSynthesis.getVoices()
+    .filter(v => v.lang.startsWith('en') && !JOKE_VOICES.test(v.name))
+    .sort((x, y) => voiceScore(y) - voiceScore(x));
+}
+
 let voice = null;
 function pickVoice() {
   if (voice) return voice;
-  const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
-  voice = voices.find(v => /Samantha|Google US English|Karen|Zira|Jenny/.test(v.name)) || voices[0] || null;
+  const voices = goodVoices();
+  voice = voices.find(v => v.name === save.voice) || voices[0] || null;
   return voice;
 }
 
@@ -205,11 +232,27 @@ function say(text) {
   try {
     speechSynthesis.cancel(); // newest thing to say wins, so Mochi never falls behind
     const u = new SpeechSynthesisUtterance(text);
-    u.rate = 0.85;
-    u.pitch = 1.15;
-    if (pickVoice()) u.voice = voice;
+    u.rate = 0.95;
+    u.pitch = 1;
+    if (pickVoice()) { u.voice = voice; u.lang = voice.lang; }
     speechSynthesis.speak(u);
   } catch (e) { /* no voice */ }
+}
+
+// a menu so a grown-up can pick the nicest voice on this device
+function fillVoiceMenu() {
+  const menu = $('voiceSelect');
+  const voices = goodVoices();
+  $('voiceRow').hidden = voices.length < 2;
+  voice = null;
+  menu.textContent = '';
+  for (const v of voices) {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = v.name.replace(/^(Microsoft|Google) /, '');
+    menu.append(opt);
+  }
+  if (pickVoice()) menu.value = voice.name;
 }
 
 const KEY_NAMES = { ' ': 'the space bar', ';': 'semicolon', ',': 'comma', '.': 'period', "'": 'apostrophe', '/': 'slash' };
@@ -361,6 +404,10 @@ function renderHome() {
   });
 
   $('starTotal').textContent = totalStars();
+  $('heroHello').textContent = save.me ? `Aloha, ${save.me}!` : "Aloha! I'm Mochi.";
+  $('heroText').textContent = save.me
+    ? "I'm Mochi, your robot cat teacher. Pick a game, or learn new keys in my typing school!"
+    : "I'm your robot cat teacher. Pick a game, or learn new keys in my typing school!";
 }
 
 function showHome() {
@@ -575,7 +622,7 @@ function startLesson(index) {
     if (lesson.keys) {
       // key drills: say the key and finger whenever the key changes
       if (want !== run.spoken && want !== ' ') {
-        if (run.hits) say(`${keyName(want)}. ${FINGER_NAMES[CHAR_MAP[want].finger]}.`);
+        if (run.hits) say(`Now ${keyName(want)}, with your ${FINGER_NAMES[CHAR_MAP[want].finger]}.`);
         run.spoken = want;
       }
     } else if (run.hits && want !== ' ' && (run.pos === 0 || line[run.pos - 1] === ' ')) {
@@ -654,7 +701,7 @@ function startLesson(index) {
       shake($('typeLine').querySelector('.current'));
       // first slip: a quick reminder. Second slip: full directions.
       if (run.missesInRow >= 2) explain();
-      else say(`Oops. Find ${keyName(want)}.`);
+      else say(`Oops! Let's find ${keyName(want)}.`);
       armIdle(explain);
       if (capsLock && ch.toLowerCase() === want.toLowerCase()) {
         $('fingerHint').innerHTML = '<span class="caps-warn">Caps Lock is on. Press the caps key to turn it off.</span>';
@@ -671,7 +718,7 @@ function startLesson(index) {
   updateStats();
   const first = expected();
   say(lesson.keys
-    ? `Let's learn ${lesson.keys.split('').map(keyName).join(' and ')}. Take your time. ${describeKey(first)}`
+    ? `${save.me ? 'Okay ' + save.me + '. ' : ''}Let's learn ${lesson.keys.split('').map(keyName).join(' and ')}. Take your time. ${describeKey(first)}`
     : `${lesson.title}. Take your time. Type ${lines[0].split(' ')[0]}. ${describeKey(first)}`);
 }
 
@@ -703,7 +750,7 @@ function showResult(o) {
   setTimeout(() => { if (!overlay.hidden) $('nextBtn').focus(); }, 500);
 
   sfx.win();
-  say(o.title + ' ' + o.msg);
+  say(`${o.title} ${o.msg}`);
   if (o.confetti) confetti();
 }
 
@@ -787,6 +834,17 @@ $('kbSurprise').addEventListener('click', e => {
 document.querySelectorAll('.cat-slot').forEach(el => { el.innerHTML = catSVG(); });
 document.querySelectorAll('.coco-slot').forEach(el => { el.innerHTML = coconutBoatSVG(); });
 document.querySelectorAll('.surfer-slot').forEach(el => { el.innerHTML = surferSVG(); });
+
+$('voiceSelect').addEventListener('change', e => {
+  save.voice = e.target.value;
+  persist();
+  voice = null;
+  say("Aloha! I'm Mochi. This is my voice.");
+});
+if ('speechSynthesis' in window) {
+  speechSynthesis.addEventListener('voiceschanged', fillVoiceMenu);
+  fillVoiceMenu();
+}
 
 buildKeyboard();
 applyKeyboardDesign();

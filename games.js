@@ -64,7 +64,7 @@ function wordFeed(lineEl, hintEl, words, intro) {
         shake(lineEl.querySelector('.current'));
         missesInRow++;
         if (missesInRow >= 2) explain();
-        else say(`Oops. Find ${keyName(word[pos])}.`);
+        else say(`Oops! Let's find ${keyName(word[pos])}.`);
         armIdle(explain);
         return 'miss';
       }
@@ -268,20 +268,27 @@ function openRowSetup() {
   setMode(null);
   showScreen('rowSetupScreen');
   const friend = save.rowVs === 'friend';
-  chipRow($('rowVs'), [['robot', '🤖 The robot'], ['friend', '👫 A friend']], save.rowVs, value => {
+  const online = save.rowVs === 'online';
+  const choices = [['robot', '🤖 The robot'], ['friend', '👫 A friend here'], ['online', '🌏 My cousin online']];
+  chipRow($('rowVs'), choices, save.rowVs, value => {
     save.rowVs = value;
     persist();
     openRowSetup();
   });
-  $('rowRule').textContent = friend
-    ? 'Take turns on the keyboard. No clock! Whoever presses fewer wrong keys wins.'
-    : 'No clock! The robot only rows when you press a wrong key, so take your time.';
+  $('rowRule').textContent = online
+    ? 'Race your cousin from far away, or team up to beat the robot!'
+    : friend
+      ? 'Take turns on the keyboard. No clock! Whoever presses fewer wrong keys wins.'
+      : 'No clock! The robot only rows when you press a wrong key, so take your time.';
+  $('rowStart').hidden = online;
+  $('onlinePanel').hidden = !online;
+  if (online) renderOnlinePanel();
 
   const box = $('rowDesigners');
   box.textContent = '';
   box.append(designerPanel(0, friend ? 'Player 1' : 'Your boat'));
   if (friend) box.append(designerPanel(1, 'Player 2'));
-  say(`Pick who is rowing and design your boat. ${$('rowRule').textContent}`);
+  if (!online) say(`Pick who is rowing and design your boat. ${$('rowRule').textContent}`);
 }
 
 // pick a rower and design their boat
@@ -313,7 +320,7 @@ function designerPanel(index, label) {
     const b = e.target.closest('[data-k]');
     if (!b) return;
     if (b.dataset.k === 'tab') tab = b.dataset.v;
-    else { rower[b.dataset.k] = b.dataset.v; persist(); }
+    else { rower[b.dataset.k] = b.dataset.v; persist(); netHello(); }
     draw();
   });
   draw();
@@ -388,6 +395,7 @@ function runRace(o) {
 
   const lanes = $('raceLanes');
   lanes.textContent = '';
+  lanes.parentElement.classList.remove('three');
   const boats = [0, 1].map(i => {
     const lane = document.createElement('div');
     lane.className = 'lane' + (i === o.typist ? ' me' : '');
