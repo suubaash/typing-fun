@@ -147,6 +147,7 @@ let save = {
   kb: { palette: 'rainbow', shape: 'soft', board: '#ffffff', sticker: '' },
   rowVs: 'robot',
   me: '', // which cousin plays on this device
+  family: '', // the family's secret code for playing online
   voice: '',
   rowers: [
     { who: '🍍', color: '#ff5d73', deco: 'stripes' },

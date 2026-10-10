@@ -17,6 +17,7 @@
         <span aria-hidden="true">⭐</span>
         <span id="starTotal">0</span>
       </div>
+      <button id="callBtn" class="icon-btn call-start" type="button" hidden>📹</button>
       <button id="soundBtn" class="icon-btn" type="button" aria-pressed="true" aria-label="Sound on">🔊</button>
     </div>
   </header>
@@ -200,6 +201,18 @@
     <span id="inviteText"></span>
     <button id="inviteYes" class="pill-btn primary" type="button">Let's go!</button>
     <button id="inviteNo" class="pill-btn" type="button">Not now</button>
+  </div>
+
+  <!-- Seeing and talking to a cousin -->
+  <div id="callBox" class="call-box" hidden>
+    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="localVideo" autoplay playsinline muted></video>
+    <div id="callStatus" class="call-status" hidden></div>
+    <div class="call-btns">
+      <button id="callMic" class="icon-btn" type="button" aria-pressed="true" aria-label="Microphone">🎤</button>
+      <button id="callCam" class="icon-btn" type="button" aria-pressed="true" aria-label="Camera">📷</button>
+      <button id="callEnd" class="icon-btn hang-up" type="button" aria-label="End the call">👋</button>
+    </div>
   </div>
 
   <div id="confetti" class="confetti" aria-hidden="true"></div>

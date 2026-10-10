@@ -669,6 +669,60 @@ kbd {
 .voice-row { color: var(--ink-soft); font-size: .9rem; display: flex; align-items: center; gap: 8px; }
 .voice-row select { font: inherit; padding: 4px 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); max-width: 14em; }
 
+.family-form { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 8px 0; }
+.family-form input {
+  font: inherit;
+  width: min(100%, 18em);
+  padding: 8px 14px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+}
+.online-panel .small .link-btn + .link-btn { margin-left: 10px; }
+.call-start { background: #c9f2c7; border-color: var(--good); }
+.call-box {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 25;
+  width: min(240px, 44vw);
+  background: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(43, 42, 76, .35);
+  cursor: grab;
+  touch-action: none;
+}
+#remoteVideo { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #1f2a44; }
+#localVideo {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 2px solid #fff;
+  background: #1f2a44;
+  transform: scaleX(-1); /* like a mirror */
+}
+.call-status {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 34%;
+  padding: 0 10px;
+  text-align: center;
+  color: #fff;
+  font-weight: 700;
+}
+.call-btns { display: flex; justify-content: center; gap: 8px; padding: 8px; }
+.call-btns .icon-btn { width: 40px; height: 40px; }
+.call-btns .icon-btn.off { background: #ffb3b3; text-decoration: line-through; opacity: .8; }
+.call-btns .hang-up { background: #ffb3b3; border-color: var(--bad); }
+
 /* ---------- finished card ---------- */
 .overlay {
   position: fixed;
