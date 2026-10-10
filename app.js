@@ -147,7 +147,6 @@ let save = {
   kb: { palette: 'rainbow', shape: 'soft', board: '#ffffff', sticker: '' },
   rowVs: 'robot',
   me: '', // which cousin plays on this device
-  family: '', // the family's secret code for playing online
   voice: '',
   rowers: [
     { who: '🍍', color: '#ff5d73', deco: 'stripes' },
@@ -406,9 +405,10 @@ function renderHome() {
 
   $('starTotal').textContent = totalStars();
   $('heroHello').textContent = save.me ? `Aloha, ${save.me}!` : "Aloha! I'm Mochi.";
+  $('heroNames').hidden = !!save.me;
   $('heroText').textContent = save.me
     ? "I'm Mochi, your robot cat teacher. Pick a game, or learn new keys in my typing school!"
-    : "I'm your robot cat teacher. Pick a game, or learn new keys in my typing school!";
+    : "I'm your robot cat teacher. Who is playing today?";
 }
 
 function showHome() {

@@ -3,12 +3,13 @@
 /* Playing with a cousin who is far away: rowing together, and seeing and talking to each other.
 
    The two browsers find each other through a free public message relay (MQTT over WebSocket).
-   Every message is locked with the family's secret code, which is typed in on each device and is
-   never part of this code, so only people who know the code can join, invite or call.
+   Messages are scrambled with the channel code below. That keeps them from being read in passing,
+   but the code is part of this public file, so it is not a real secret.
    Video and sound go straight from one browser to the other (WebRTC), not through the relay. */
 
 const PLAYERS = ['Shivalika', 'Vedisha'];
 const NET_URL = 'wss://broker.emqx.io:8084/mqtt';
+const CHANNEL_CODE = 'ohana-typing-fun-7f3k9q2x';
 const TEAM_ROBOT_STEPS = 8; // wrong keys (from both cousins) it takes for the robot to finish
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
 
@@ -19,12 +20,13 @@ const net = {
   up: false,
   topic: '',
   key: null,      // locks and unlocks messages
-  peer: null,     // { sid, name, rower, letters, seen }
+  peer: null,     // { sid, name, rower, letters, seen, video }
   pending: null,  // a race invite we sent and are waiting on: { race, mode, words }
-  incoming: null, // an invite or a call we received
+  incoming: null, // what the yellow banner is asking: a race invite, or { video: true }
   race: null,     // the online race being played: { id, onMessage }
   last: null,     // how our last race ended, in case the cousin missed it
-  call: null,     // the video call: { id, local, pc, caller, ice, timer }
+  call: null,     // the video call: { id, local, pc, ice }
+  endedAt: 0,     // when the last video call ended
   note: '',       // a line to show in the online panel
 };
 
@@ -32,8 +34,8 @@ const peerOnline = () => !!net.peer && Date.now() - net.peer.seen < 12000;
 const cousinName = () => (net.peer && net.peer.name) || PLAYERS.find(p => p !== save.me) || 'your cousin';
 const onSetup = () => !$('rowSetupScreen').hidden && save.rowVs === 'online';
 
-/* ---------- the family code: a private channel and a lock ---------- */
-async function familyKeys(code) {
+/* ---------- a channel and a lock made from the channel code ---------- */
+async function channelKeys(code) {
   const enc = new TextEncoder();
   const secret = await crypto.subtle.importKey('raw', enc.encode(code.trim().toLowerCase()), 'PBKDF2', false, ['deriveBits']);
   const bits = new Uint8Array(await crypto.subtle.deriveBits(
@@ -74,17 +76,17 @@ function netSend(type, data) {
 
 // tell the cousin we are here, what our boat looks like and which letters we know
 function netHello() {
-  netSend('hello', { rower: save.rowers[0], letters: knownLetters().join('') });
+  netSend('hello', { rower: save.rowers[0], letters: knownLetters().join(''), video: !!net.call });
 }
 
 async function netConnect() {
-  if (net.client || net.starting || !save.me || !save.family) return;
+  if (net.client || net.starting || !save.me) return;
   if (typeof mqtt === 'undefined' || !window.crypto || !crypto.subtle) {
     net.note = 'Online play needs the internet. Check the connection and open the game again.';
     return;
   }
   net.starting = true;
-  Object.assign(net, await familyKeys(save.family));
+  Object.assign(net, await channelKeys(CHANNEL_CODE));
   net.client = mqtt.connect(NET_URL, { clientId: 'tf-' + net.sid, keepalive: 30, reconnectPeriod: 4000 });
   net.client.on('connect', () => {
     net.up = true;
@@ -97,7 +99,7 @@ async function netConnect() {
   net.client.on('message', (topic, payload) => {
     const packed = payload.toString();
     inbox = inbox.then(async () => {
-      const m = JSON.parse(await unlock(packed)); // fails for anyone without the family code
+      const m = JSON.parse(await unlock(packed));
       if (m && m.sid && m.sid !== net.sid) await onNetMessage(m);
     }).catch(() => {});
   });
@@ -112,12 +114,11 @@ async function netConnect() {
     if (!now && net.call) endCall(`${cousinName()} went offline.`, false);
   }, 2000);
   window.addEventListener('pagehide', () => {
-    if (net.call) netSend('hangup', { call: net.call.id });
     netSend('bye', {});
   });
 }
 
-// Even with the lock, tidy up what arrives before showing it.
+// Messages come over a public relay, so tidy up what arrives before showing it.
 function cleanRower(r) {
   const ok = r && Object.values(RIDERS).some(list => list.includes(r.who)) &&
     BOAT_COLORS.includes(r.color) && r.deco in BOAT_DECOS;
@@ -129,14 +130,22 @@ const cleanWords = w => (Array.isArray(w) ? w : []).filter(x => /^[a-z]{1,8}$/.t
 async function onNetMessage(m) {
   if (m.type === 'hello') {
     const isNew = !peerOnline() || net.peer.sid !== m.sid;
+    const wasVideo = !!net.peer && net.peer.video;
     net.peer = {
       sid: m.sid,
       name: cleanName(m.from),
       rower: cleanRower(m.rower),
       letters: String(m.letters || '').replace(/[^a-z]/g, ''),
       seen: Date.now(),
+      // right after a call ends, an old "video on" message may still be on its way: ignore it
+      video: !!m.video && Date.now() - net.endedAt > 6000,
     };
+    if (isNew && net.call) endCall('', false); // she reloaded the page
+    const startedVideo = net.peer.video && !(wasVideo && !isNew);
     if (isNew) { netHello(); refreshOnline(); }
+    // she just came online, or she just turned her video on: ask to join
+    if ((isNew || startedVideo) && !net.call && !(net.incoming && !net.incoming.video)) showInvite({ video: true });
+    connectVideo();
     return;
   }
   if (!net.peer || m.sid !== net.peer.sid) return;
@@ -173,7 +182,7 @@ async function onNetMessage(m) {
     } else {
       netSend('leave', { race: m.race });
     }
-  } else if (['call', 'callok', 'callno', 'sdp', 'ice', 'hangup'].includes(m.type)) {
+  } else if (['sdp', 'ice', 'hangup'].includes(m.type)) {
     await onCallMessage(m);
   } else if (net.race && m.race === net.race.id) {
     net.race.onMessage(m);
@@ -199,12 +208,13 @@ function sendInvite(mode) {
   refreshOnline();
 }
 
-// the yellow banner: a race invite { race, mode, words } or a call { call }
+// the yellow banner: a race invite { race, mode, words } or the video question { video: true }
 function showInvite(m) {
   net.incoming = m;
-  const what = m.call ? 'wants to see and talk to you!'
+  const what = m.video ? (net.peer.video ? 'is waiting to see and talk to you!' : 'is here! Do you want to see and talk to her?')
     : m.mode === 'team' ? 'wants to team up against the robot!' : 'wants to race you!';
-  $('inviteText').textContent = `${m.call ? '📹' : '🚣'} ${cousinName()} ${what}`;
+  $('inviteText').textContent = `${m.video ? '📹' : '🚣'} ${cousinName()} ${what}`;
+  $('inviteYes').textContent = m.video ? 'Join' : "Let's go!";
   $('inviteBanner').hidden = false;
   sfx.win();
   say(`${cousinName()} ${what}`);
@@ -220,7 +230,7 @@ $('inviteYes').addEventListener('click', () => {
   const m = net.incoming;
   hideInvite();
   if (!m) return;
-  if (m.call) return answerCall(m.call);
+  if (m.video) return joinVideo();
   netSend('accept', { race: m.race });
   runOnlineRace({ race: m.race, mode: m.mode, words: m.words });
 });
@@ -228,8 +238,7 @@ $('inviteNo').addEventListener('click', () => {
   const m = net.incoming;
   hideInvite();
   if (!m) return;
-  if (m.call) netSend('callno', { call: m.call });
-  else netSend('decline', { race: m.race });
+  if (!m.video) netSend('decline', { race: m.race });
 });
 
 /* ---------- the online part of the rowing setup screen ---------- */
@@ -244,16 +253,6 @@ function renderOnlinePanel() {
   if (!save.me) {
     panel.innerHTML = `<p class="who">Who are you?</p><div class="chips">` +
       PLAYERS.map(p => `<button type="button" class="pill-btn big" data-me="${p}">${p}</button>`).join('') + `</div>`;
-    return;
-  }
-  if (!save.family) {
-    panel.innerHTML =
-      `<p class="who">Hi ${save.me}! Ask a grown-up to type the family code.</p>` +
-      `<form id="familyForm" class="family-form">` +
-        `<input id="familyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" minlength="8" required placeholder="our family secret code" aria-label="Family secret code">` +
-        `<button type="submit" class="pill-btn primary">Save</button>` +
-      `</form>` +
-      `<p class="small">Grown-ups: make up a secret phrase of 8 or more letters and type the very same one on both cousins' devices. Only devices with this code can find, invite or call each other. Keep it private.</p>`;
     return;
   }
   netConnect();
@@ -275,37 +274,27 @@ function renderOnlinePanel() {
     `<p class="who">You are ${save.me}</p>` +
     `<p class="status ${online ? 'on' : ''}">${status}</p>` + actions +
     (net.note && net.client && !net.pending ? `<p class="small">${net.note}</p>` : '') +
-    `<p class="small"><button type="button" class="link-btn" data-act="switch">Not ${save.me}? Switch player</button>` +
-    `<button type="button" class="link-btn" data-act="recode">Change family code</button></p>`;
+    `<p class="small"><button type="button" class="link-btn" data-act="switch">Not ${save.me}? Switch player</button></p>`;
 }
-
-$('onlinePanel').addEventListener('submit', e => {
-  e.preventDefault();
-  const code = $('familyInput').value.trim();
-  if (code.length < 8) return;
-  save.family = code;
-  persist();
-  renderOnlinePanel();
-});
 
 $('onlinePanel').addEventListener('click', e => {
   const b = e.target.closest('button');
-  if (!b || b.type === 'submit') return;
+  if (!b) return;
   if (b.dataset.me) {
     save.me = b.dataset.me;
     persist();
     say(`Aloha, ${save.me}!`);
     netHello();
-  } else if (b.dataset.act === 'switch' || b.dataset.act === 'recode') {
-    // a new name or code needs a fresh start
-    if (b.dataset.act === 'switch') save.me = ''; else save.family = '';
+  } else if (b.dataset.act === 'switch') {
+    // a new name needs a fresh start
+    save.me = '';
     persist();
     if (net.client) return location.reload();
   } else if (b.dataset.act === 'cancel') {
     netSend('cancel', { race: net.pending.race });
     net.pending = null;
   } else if (b.dataset.act === 'call') {
-    startCall();
+    joinVideo();
   } else if (peerOnline()) {
     sendInvite(b.dataset.act);
   }
@@ -349,25 +338,27 @@ function openCallBox(call, status) {
   refreshOnline();
 }
 
-async function startCall() {
+// She tapped Join (or the camera button): turn on the camera and wait for the cousin to join too.
+async function joinVideo() {
   if (net.call || !peerOnline()) return;
+  hideInvite();
   const local = await getMedia();
   if (!local) return noMedia();
-  const id = net.sid + Date.now().toString(36);
-  openCallBox({ id, local, pc: null, caller: true, ice: [] }, `Calling ${cousinName()}…`);
-  net.call.timer = setTimeout(() => endCall(`${cousinName()} did not answer. Try again later.`), 45000);
-  netSend('call', { call: id });
-  say(`Calling ${cousinName()}.`);
+  // both browsers work out the same call name
+  const id = [net.sid, net.peer.sid].sort().join('-');
+  openCallBox({ id, local, pc: null, ice: [] }, `Waiting for ${cousinName()} to join…`);
+  netHello(); // tells her we joined
+  connectVideo();
 }
 
-async function answerCall(id) {
-  const local = await getMedia();
-  if (!local) {
-    netSend('callno', { call: id });
-    return noMedia();
-  }
-  openCallBox({ id, local, pc: null, caller: false, ice: [] }, 'Connecting…');
-  netSend('callok', { call: id });
+// Once both have joined, the browser with the smaller id starts the connection.
+async function connectVideo() {
+  const call = net.call;
+  if (!call || call.pc || !peerOnline() || !net.peer.video || net.sid > net.peer.sid) return;
+  callStatus('Connecting…');
+  const pc = makePeer();
+  await pc.setLocalDescription(await pc.createOffer());
+  netSend('sdp', { call: call.id, sdp: pc.localDescription });
 }
 
 function makePeer() {
@@ -386,26 +377,16 @@ function makePeer() {
 }
 
 async function onCallMessage(m) {
-  if (m.type === 'call') {
-    if (net.call) return netSend('callno', { call: m.call, busy: true });
-    return showInvite({ call: String(m.call) });
-  }
-  if (m.type === 'hangup' && net.incoming && net.incoming.call === m.call) return hideInvite();
+  // she gave up waiting before we joined
+  if (m.type === 'hangup' && !net.call && net.incoming && net.incoming.video) return hideInvite();
   const call = net.call;
   if (!call || m.call !== call.id) return;
 
-  if (m.type === 'callno') {
-    endCall(`${cousinName()} can't talk right now.`, false);
-  } else if (m.type === 'hangup') {
+  if (m.type === 'hangup') {
     endCall(`${cousinName()} said bye!`, false);
-  } else if (m.type === 'callok' && call.caller && !call.pc) {
-    clearTimeout(call.timer);
-    callStatus('Connecting…');
-    const pc = makePeer();
-    await pc.setLocalDescription(await pc.createOffer());
-    netSend('sdp', { call: call.id, sdp: pc.localDescription });
   } else if (m.type === 'sdp') {
     const pc = call.pc || makePeer();
+    callStatus('Connecting…');
     await pc.setRemoteDescription(m.sdp);
     for (const cand of call.ice.splice(0)) await pc.addIceCandidate(cand).catch(() => {});
     if (m.sdp.type === 'offer') {
@@ -422,8 +403,10 @@ function endCall(note, tell = true) {
   const call = net.call;
   if (!call) return;
   net.call = null;
-  clearTimeout(call.timer);
+  net.endedAt = Date.now();
+  if (net.peer) net.peer.video = false;
   if (tell) netSend('hangup', { call: call.id });
+  netHello();
   call.local.getTracks().forEach(t => t.stop());
   if (call.pc) call.pc.close();
   $('remoteVideo').srcObject = null;
@@ -444,7 +427,7 @@ function toggleTracks(button, kind) {
 $('callMic').addEventListener('click', e => toggleTracks(e.currentTarget, 'Audio'));
 $('callCam').addEventListener('click', e => toggleTracks(e.currentTarget, 'Video'));
 $('callEnd').addEventListener('click', () => endCall(''));
-$('callBtn').addEventListener('click', e => { e.currentTarget.blur(); startCall(); });
+$('callBtn').addEventListener('click', e => { e.currentTarget.blur(); joinVideo(); });
 
 // the call window can be dragged out of the way
 (() => {
@@ -615,5 +598,14 @@ function runOnlineRace(invite) {
   report();
 }
 
-// be reachable for invites and calls from anywhere in the game
+// the home page asks who is playing, so the cousins can find each other from anywhere in the game
+$('heroNames').addEventListener('click', e => {
+  const b = e.target.closest('[data-me]');
+  if (!b) return;
+  save.me = b.dataset.me;
+  persist();
+  say(`Aloha, ${save.me}!`);
+  renderHome();
+  netConnect();
+});
 netConnect();
