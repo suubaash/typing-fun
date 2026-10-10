@@ -60,6 +60,11 @@
           <span class="game-name">My Keyboard</span>
           <span class="game-sub">Design your very own keyboard</span>
         </button>
+        <button id="gameVoice" class="game-card g-voice" type="button">
+          <span class="game-art" aria-hidden="true">🎤🐱</span>
+          <span class="game-name">My Voice</span>
+          <span class="game-sub">Record your voice for Mochi</span>
+        </button>
       </div>
 
       <h2 class="group-title school-title">Mochi's typing school</h2>
@@ -102,6 +107,35 @@
       <div id="kbOptions" class="panel kb-options"></div>
       <p class="tip">Press any key to try it out!</p>
       <div class="kb-slot"></div>
+    </section>
+
+    <!-- Recording studio -->
+    <section id="voiceScreen" class="screen" hidden>
+      <div class="play-head">
+        <button class="pill-btn back-btn" type="button">← Home</button>
+        <h2>🎤 My Voice</h2>
+        <div class="hud"><span class="hud-pill">✓ <b id="recCount">0 / 0</b></span></div>
+      </div>
+      <div class="panel rec-card">
+        <p id="recGroup" class="rec-group"></p>
+        <p class="rec-say">Say:</p>
+        <p id="recText" class="rec-text"></p>
+        <p id="recStatus" class="tip" aria-live="polite"></p>
+        <div class="chips rec-actions">
+          <button id="recBtn" class="pill-btn primary big" type="button">🎤 Record</button>
+          <button id="recPlay" class="pill-btn big" type="button">▶ Listen</button>
+          <button id="recNext" class="pill-btn big" type="button">Next →</button>
+        </div>
+      </div>
+      <div id="recList" class="rec-list"></div>
+      <div class="panel rec-grownups">
+        <label class="rec-use"><input id="recUse" type="checkbox"> Use the recorded voice in the game</label>
+        <p class="small">Grown-ups: recordings stay on this device. To let both cousins hear them, tap "Save voice file" and add the file to the game.</p>
+        <div class="chips">
+          <button id="recSave" class="pill-btn" type="button">💾 Save voice file</button>
+          <button id="recClear" class="link-btn" type="button">Delete my recordings</button>
+        </div>
+      </div>
     </section>
 
     <!-- Game 1: relaxing fruit game -->
@@ -224,6 +258,7 @@
   <script src="art.js"></script>
   <script src="app.js"></script>
   <script src="games.js"></script>
+  <script src="voice.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js" defer></script>
   <script src="online.js" defer></script>
 </body>

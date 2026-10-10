@@ -227,16 +227,33 @@ function pickVoice() {
   return voice;
 }
 
-function say(text) {
-  if (!save.sound || !text || !('speechSynthesis' in window)) return;
+// the device voice; done() is called when it has finished
+function ttsSpeak(text, done) {
   try {
-    speechSynthesis.cancel(); // newest thing to say wins, so Mochi never falls behind
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 0.95;
     u.pitch = 1;
     if (pickVoice()) { u.voice = voice; u.lang = voice.lang; }
+    if (done) u.onend = u.onerror = done;
     speechSynthesis.speak(u);
-  } catch (e) { /* no voice */ }
+  } catch (e) {
+    if (done) done();
+  }
+}
+
+function say(text) {
+  if (!save.sound || !text) return;
+  // a child's own recordings come first (voice.js), then the device voice
+  if (typeof clipSay === 'function' && clipSay(text)) return;
+  if (typeof stopClips === 'function') stopClips();
+  if (!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel(); // newest thing to say wins, so Mochi never falls behind
+  ttsSpeak(text);
+}
+
+function hush() {
+  if (typeof stopClips === 'function') stopClips();
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
 }
 
 // a menu so a grown-up can pick the nicest voice on this device
@@ -326,7 +343,7 @@ const $ = id => document.getElementById(id);
 const overlay = $('resultOverlay');
 const keyEls = {};
 const fingerEls = { left: {}, right: {} };
-const SCREENS = ['homeScreen', 'playScreen', 'kbScreen', 'fruitScreen', 'surfScreen', 'rowSetupScreen', 'raceScreen'];
+const SCREENS = ['homeScreen', 'playScreen', 'kbScreen', 'voiceScreen', 'fruitScreen', 'surfScreen', 'rowSetupScreen', 'raceScreen'];
 
 // whatever is being played right now: { onChar(ch, capsLock), expected(), stop() }
 let mode = null;
@@ -413,7 +430,7 @@ function renderHome() {
 
 function showHome() {
   setMode(null);
-  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  hush();
   showScreen('homeScreen');
   renderHome();
 }
@@ -795,7 +812,7 @@ $('soundBtn').addEventListener('click', e => {
   save.sound = !save.sound;
   persist();
   paintSound();
-  if (!save.sound && 'speechSynthesis' in window) speechSynthesis.cancel();
+  if (!save.sound) hush();
   e.currentTarget.blur(); // so the space bar doesn't toggle it mid-lesson
 });
 

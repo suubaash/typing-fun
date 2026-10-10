@@ -636,6 +636,23 @@ kbd {
 .emoji-btn[aria-pressed="true"] { border-color: var(--primary); background: #efeaff; }
 .start-row { text-align: center; margin-top: 18px; }
 
+/* ---------- recording studio ---------- */
+.g-voice { background: #ffd6e0; }
+.rec-card { text-align: center; padding: 20px 16px; }
+.rec-group { color: var(--ink-soft); text-transform: uppercase; letter-spacing: .08em; font-size: .85rem; }
+.rec-say { color: var(--ink-soft); margin-top: 6px; }
+.rec-text { font-size: clamp(1.6rem, 5vw, 2.6rem); font-weight: 800; line-height: 1.2; margin: 4px 0 8px; text-wrap: balance; }
+.rec-actions { justify-content: center; margin-top: 6px; }
+.rec-actions .pill-btn:disabled { opacity: .45; cursor: not-allowed; }
+.pill-btn.recording { background: var(--bad); border-color: #b3282d; animation: pop .9s ease-in-out infinite; }
+.rec-list { margin: 6px 0 16px; }
+.rec-list .rec-chip { margin: 0 6px 8px 0; font-size: .9rem; padding: 4px 12px; }
+.rec-chip.done { background: #dff7dd; border-color: var(--good); }
+.rec-chip[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(108, 77, 246, .2); }
+.rec-grownups .small { color: var(--ink-soft); font-size: .9rem; margin: 8px 0 12px; }
+.rec-use { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.rec-use input { width: 20px; height: 20px; }
+
 /* ---------- playing online ---------- */
 .online-panel { text-align: center; }
 .online-panel .who { font-weight: 800; font-size: 1.15rem; margin: 6px 0 10px; }
